@@ -5,6 +5,7 @@ import cookieParser from "cookie-parser";
 import { notFound } from "./middlewares/notFound";
 import { globalErrorHandler } from "./middlewares/globalErrorHandler";
 import { userRoutes } from "./modules/user/user.route";
+import { authRoutes } from "./modules/auth/auth.route";
 const app : Application = express();
 
 app.use(cors({
@@ -22,6 +23,7 @@ app.get("/",(req : Request, res : Response) => {
     res.send("Hello, World!");
 });
 app.use("/api/users",userRoutes);
+app.use("/api/users",authRoutes);
  app.use(notFound)
 app.use(globalErrorHandler)
 
