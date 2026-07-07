@@ -4,6 +4,21 @@ import { authService } from "./auth.service";
 import { sendResponse } from "../../utils/sendResponse";
 import httpStatus from "http-status";
 
+
+const registerUser = catchAsync( async (req: Request, res: Response, next: NextFunction) => {
+    const payload = req.body;
+
+    const user = await authService.registerUserIntoDB(payload);
+
+
+
+    sendResponse(res, {
+        success: true,
+        statusCode: httpStatus.CREATED,
+        message: "User registered successfully",
+        data: { user }
+    })
+})
 const loginUser = catchAsync(async (req : Request, res : Response, next : NextFunction) => {
  const payload = req.body;
     const {accessToken, refreshToken} = await authService.loginUser(payload);
@@ -29,7 +44,20 @@ const loginUser = catchAsync(async (req : Request, res : Response, next : NextFu
         data: { accessToken, refreshToken }
     });
 });
+const getMyProfile = catchAsync( async (req: Request, res: Response, next: NextFunction) => {
 
+
+
+    const profile = await authService.getMyProfileFromDB(req.user?.id as string);
+
+
+    sendResponse(res, {
+        success: true,
+        statusCode: httpStatus.OK,
+        message: "User profile fetched successfully",
+        data: { profile }
+    })
+})
 const refreshToken = catchAsync(async (req : Request, res : Response, next: NextFunction) => {
     const refreshToken = req.cookies.refreshToken;
 
@@ -52,7 +80,9 @@ const refreshToken = catchAsync(async (req : Request, res : Response, next: Next
     })
 })
 export const authController = {
+    registerUser,
     loginUser,
+    getMyProfile,
     refreshToken
 
 }

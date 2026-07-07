@@ -1,24 +1,39 @@
+
 import { NextFunction, Request, Response } from "express";
+import httpStatus from "http-status";
 import { catchAsync } from "../../utils/catchAsync";
 import { sendResponse } from "../../utils/sendResponse";
-import httpStatus from "http-status";
 import { userService } from "./user.service";
-const registerUser = catchAsync( async (req: Request, res: Response, next: NextFunction) => {
-    const payload = req.body;
-
-    const user = await userService.registerUserIntoDB(payload);
-
-
+ const getAllUsers = catchAsync(
+  async (req: Request, res: Response, next: NextFunction) => {
+    const result = await userService.getAllUsersFromDB();
 
     sendResponse(res, {
-        success: true,
-        statusCode: httpStatus.CREATED,
-        message: "User registered successfully",
-        data: { user }
-    })
-})
+      success: true,
+      statusCode: httpStatus.OK,
+      message: "Users retrieved successfully",
+      data: result,
+    });
+  }
+);
+
+const updateUserStatus = catchAsync(
+  async (req: Request, res: Response, next: NextFunction) => {
+    const { id } = req.params;
+    const { status } = req.body;
+
+    const result = await userService.updateUserStatusInDB(id, status);
+
+    sendResponse(res, {
+      success: true,
+      statusCode: httpStatus.OK,
+      message: "User status updated successfully",
+      data: result,
+    });
+  }
+);
 
 export const userController = {
-    registerUser,
-
-}
+  getAllUsers,
+  updateUserStatus,
+};

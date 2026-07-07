@@ -3,9 +3,45 @@ import { JwtPayload, SignOptions } from "jsonwebtoken";
 import config from "../../config";
 import { prisma } from "../../lib/prisma";
 import { jwtUtils } from "../../utils/jwt";
-import { ILoginUser } from "./auth.interface";
+import { ILoginUser, RegisterUserPayload } from "./auth.interface";
 import { UserStatus } from "../../../generated/prisma/enums";
+import { Role } from "../../../generated/prisma/enums";
 
+
+const registerUserIntoDB = async (payload: RegisterUserPayload) =>{
+    const { name, email,role, password } = payload;
+    const isUserExist = await prisma.user.findUnique({
+        where: { email }
+    })
+    if (isUserExist) {
+        throw new Error("User with this email already exists");
+    }
+
+    const hashedPassword = await bcrypt.hash(password, Number(config.bcrypt_salt_rounds))
+
+    const createdUser = await prisma.user.create({
+        data: {
+            name,
+            email,
+            role: payload.role.toUpperCase() as Role,
+            password: hashedPassword,
+
+        }
+    });
+
+    const user = await prisma.user.findUnique({
+        where: {
+            id: createdUser.id,
+            email: createdUser.email || email,
+            role: payload.role.toUpperCase() as Role,
+        },
+        omit: {
+            password: true
+        }
+    })
+
+    return user;
+}
 const loginUser = async (payload : ILoginUser) => {
     const { email, password } = payload;
 
@@ -28,7 +64,7 @@ const loginUser = async (payload : ILoginUser) => {
         name: user.name,
         email: user.email,
         role: user.role
-    } 
+    }
     const accessToken = jwtUtils.createToken(
         jwtPayload,
         config.jwt_access_secret,
@@ -45,7 +81,16 @@ const loginUser = async (payload : ILoginUser) => {
         refreshToken
     };
 }
+const getMyProfileFromDB = async (userId : string) => {
+    const user = await prisma.user.findUniqueOrThrow({
+        where : {id : userId},
+        omit : {
+            password : true
+        }
+    });
 
+    return user;
+}
 const refreshToken = async (refreshToken : string) => {
     const verifiedRefreshToken = jwtUtils.verifyToken(refreshToken, config.jwt_refresh_secret);
 
@@ -84,6 +129,8 @@ const refreshToken = async (refreshToken : string) => {
 
 
 export const authService = {
+    registerUserIntoDB,
     loginUser,
+    getMyProfileFromDB,
     refreshToken
 }
