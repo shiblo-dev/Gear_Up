@@ -7,6 +7,7 @@ import { globalErrorHandler } from "./middlewares/globalErrorHandler";
 import { userRoutes } from "./modules/user/user.route";
 import { authRoutes } from "./modules/auth/auth.route";
 import { categoryRoutes } from "./modules/category/category.route";
+import { GearItemRoutes } from "./modules/gearitem/gearitems.route";
 const app : Application = express();
 
 app.use(cors({
@@ -29,6 +30,7 @@ app.use(
     "/api/categories",
     categoryRoutes
 );
+app.use("/api/gear", GearItemRoutes);
  app.use(notFound)
 app.use(globalErrorHandler)
 
