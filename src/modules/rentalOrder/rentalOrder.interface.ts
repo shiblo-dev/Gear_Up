@@ -1,5 +1,10 @@
-export type TCreateRentalOrder = {
+ export type TRentalOrderItemInput = {
   gearItemId: string;
-  startDate: string; // ISO date string
-  endDate: string;
+  quantity: number;
+};
+
+export type TCreateRentalOrder = {
+  startDate: string;
+  endDate: string;  
+  items: TRentalOrderItemInput[];
 };

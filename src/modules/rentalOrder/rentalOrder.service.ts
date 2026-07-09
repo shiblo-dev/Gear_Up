@@ -1,59 +1,166 @@
-import httpStatus from 'http-status';
-
-import { TCreateRentalOrder } from './rentalOrder.interface';
-import { prisma } from '../../lib/prisma';
+ import httpStatus from 'http-status';
 import AppError from '../../errors/AppError';
+import { prisma } from '../../lib/prisma';
+import { RentalStatus } from '../../../generated/prisma/enums';
+import { Prisma } from '../../../generated/prisma/client';
 
-const createRentalOrderIntoDB = async (
-  customerId: string,
-  payload: TCreateRentalOrder,
-) => {
-  const gearItem = await prisma.gearItem.findUnique({
-    where: { id: payload.gearItemId },
-  });
 
-  if (!gearItem) {
-    throw new AppError(httpStatus.NOT_FOUND, 'GearItem not found');
+type TRentalOrderItemInput = {
+  gearItemId: string;
+  quantity: number;
+};
+
+type TCreateRentalOrderInput = {
+  startDate: string;
+  endDate: string;
+  items: TRentalOrderItemInput[];
+};
+
+const createRentalOrderIntoDB = async (customerId: string, payload: TCreateRentalOrderInput) => {
+  const { startDate, endDate, items } = payload;
+
+  if (!items || items.length === 0) {
+    throw new AppError(httpStatus.BAD_REQUEST, 'At least one gear item is required to place a rental order');
   }
 
-  if (!gearItem.isAvailable) {
-    throw new AppError(httpStatus.BAD_REQUEST, 'GearItem is not available for rent');
+  const start = new Date(startDate);
+  const end = new Date(endDate);
+
+  if (isNaN(start.getTime()) || isNaN(end.getTime())) {
+    throw new AppError(httpStatus.BAD_REQUEST, 'Invalid startDate or endDate');
   }
 
-  const overlappingOrder = await prisma.rentalOrder.findFirst({
-    where: {
-      gearItemId: payload.gearItemId,
-      status: { in: ['PLACED', 'CONFIRMED', 'PAID', 'PICKED_UP'] },
-      startDate: { lte: new Date(payload.endDate) },
-      endDate: { gte: new Date(payload.startDate) },
-    },
-  });
+  if (end <= start) {
+    throw new AppError(httpStatus.BAD_REQUEST, 'endDate must be after startDate');
+  }
 
-  if (overlappingOrder) {
-    throw new AppError(
-      httpStatus.CONFLICT,
-      'GearItem is already booked for the selected date range',
+  // number of rental days (minimum 1)
+  const rentalDays = Math.max(
+    1,
+    Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)),
+  );
+
+  // merge duplicate gearItemId entries so stock/availability is checked against the true total quantity
+  const mergedItemsMap = new Map<string, number>();
+  for (const item of items) {
+    mergedItemsMap.set(
+      item.gearItemId,
+      (mergedItemsMap.get(item.gearItemId) ?? 0) + item.quantity,
     );
   }
-
-  const days = Math.ceil(
-    (new Date(payload.endDate).getTime() - new Date(payload.startDate).getTime()) /
-      (1000 * 60 * 60 * 24),
+  const mergedItems: TRentalOrderItemInput[] = Array.from(mergedItemsMap.entries()).map(
+    ([gearItemId, quantity]) => ({ gearItemId, quantity }),
   );
-  const totalPrice = days * Number(gearItem.pricePerDay);;
 
-  const result = await prisma.rentalOrder.create({
-    data: {
-      customerId,
-      gearItemId  : payload.gearItemId ,
-      startDate: new Date(payload.startDate),
-      endDate: new Date(payload.endDate),
-      totalPrice,
-      status: 'PLACED',
-    },
-    include: {
-      gearItem: true,
-    },
+  // fetch all gear items involved in a single query
+  const gearItemIds = mergedItems.map((item) => item.gearItemId);
+
+  const gearItems = await prisma.gearItem.findMany({
+    where: { id: { in: gearItemIds } },
+  });
+
+  if (gearItems.length !== gearItemIds.length) {
+    throw new AppError(httpStatus.NOT_FOUND, 'One or more gear items were not found');
+  }
+
+  // check each gear item isn't already booked for an overlapping date range
+  const activeStatuses: RentalStatus[] = [
+    RentalStatus.PLACED,
+    RentalStatus.CONFIRMED,
+    RentalStatus.PAID,
+    RentalStatus.PICKED_UP,
+  ];
+
+  for (const gearItemId of gearItemIds) {
+    const overlappingItem = await prisma.rentalOrderItem.findFirst({
+      where: {
+        gearItemId,
+        rentalOrder: {
+          status: { in: activeStatuses },
+          startDate: { lte: end },
+          endDate: { gte: start },
+        },
+      },
+      include: { gearItem: true },
+    });
+
+    if (overlappingItem) {
+      throw new AppError(
+        httpStatus.CONFLICT,
+        `${overlappingItem.gearItem.name} is already booked for the selected date range`,
+      );
+    }
+  }
+
+  // validate availability + stock, and build order items with calculated subtotal
+  const orderItemsData = mergedItems.map((item) => {
+    const gearItem = gearItems.find((g) => g.id === item.gearItemId);
+
+    if (!gearItem) {
+      throw new AppError(httpStatus.NOT_FOUND, `Gear item ${item.gearItemId} not found`);
+    }
+
+    if (!gearItem.isAvailable) {
+      throw new AppError(httpStatus.BAD_REQUEST, `${gearItem.name} is not currently available`);
+    }
+
+    if (gearItem.stockQuantity < item.quantity) {
+      throw new AppError(
+        httpStatus.BAD_REQUEST,
+        `${gearItem.name} does not have enough stock. Available: ${gearItem.stockQuantity}`,
+      );
+    }
+
+    const pricePerDay = Number(gearItem.pricePerDay);
+    const subtotal = pricePerDay * item.quantity * rentalDays;
+
+    return {
+      gearItemId: gearItem.id,
+      quantity: item.quantity,
+      pricePerDay: gearItem.pricePerDay,
+      subtotal: new Prisma.Decimal(subtotal),
+    };
+  });
+
+  const totalAmount = orderItemsData.reduce(
+    (sum, item) => sum + Number(item.subtotal),
+    0,
+  );
+
+  // create rental order + nested items in a single transaction
+  const result = await prisma.$transaction(async (tx) => {
+    const rentalOrder = await tx.rentalOrder.create({
+      data: {
+        customerId,
+        startDate: start,
+        endDate: end,
+        totalAmount: new Prisma.Decimal(totalAmount),
+        items: {
+          create: orderItemsData,
+        },
+      },
+      include: {
+        items: {
+          include: {
+            gearItem: true,
+          },
+        },
+      },
+    });
+
+    // decrement stock for each gear item (merged quantities)
+    for (const item of mergedItems) {
+      await tx.gearItem.update({
+        where: { id: item.gearItemId },
+        data: {
+          stockQuantity: {
+            decrement: item.quantity,
+          },
+        },
+      });
+    }
+
+    return rentalOrder;
   });
 
   return result;
@@ -62,7 +169,14 @@ const createRentalOrderIntoDB = async (
 const getMyRentalOrdersFromDB = async (customerId: string) => {
   const result = await prisma.rentalOrder.findMany({
     where: { customerId },
-    include: { gearItem: true },
+    include: {
+      items: {
+        include: {
+          gearItem: true,
+        },
+      },
+      payment: true,
+    },
     orderBy: { createdAt: 'desc' },
   });
 
@@ -70,20 +184,27 @@ const getMyRentalOrdersFromDB = async (customerId: string) => {
 };
 
 const getSingleRentalOrderFromDB = async (id: string, customerId: string) => {
-  const result = await prisma.rentalOrder.findUnique({
+  const rentalOrder = await prisma.rentalOrder.findUnique({
     where: { id },
-    include: { gearItem: true },
+    include: {
+      items: {
+        include: {
+          gearItem: true,
+        },
+      },
+      payment: true,
+    },
   });
 
-  if (!result) {
+  if (!rentalOrder) {
     throw new AppError(httpStatus.NOT_FOUND, 'Rental order not found');
   }
 
-  if (result.customerId !== customerId) {
-    throw new AppError(httpStatus.FORBIDDEN, 'You are not allowed to view this order');
+  if (rentalOrder.customerId !== customerId) {
+    throw new AppError(httpStatus.FORBIDDEN, 'You are not authorized to view this rental order');
   }
 
-  return result;
+  return rentalOrder;
 };
 
 export const rentalOrderServices = {
