@@ -35,7 +35,7 @@ router.post(
 router.patch(
     "/:id",
     auth(Role.ADMIN),
-    validateRequest(categoryValidation.updateCategorySchema),
+    validateRequest(categoryValidation.updateCategorySchema ),
     categoryController.updateCategory
 );
 

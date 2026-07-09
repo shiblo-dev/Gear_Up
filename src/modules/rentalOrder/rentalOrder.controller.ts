@@ -31,7 +31,7 @@ const getMyRentalOrders = catchAsync(async (req: Request, res: Response) => {
 const getSingleRentalOrder = catchAsync(async (req: Request, res: Response) => {
   const { id } = req.params;
   const customerId = req.user?.id as string;
-  const result = await rentalOrderServices.getSingleRentalOrderFromDB(id, customerId);
+  const result = await rentalOrderServices.getSingleRentalOrderFromDB(id as string, customerId);
 
   sendResponse(res, {
     success: true,
@@ -41,22 +41,10 @@ const getSingleRentalOrder = catchAsync(async (req: Request, res: Response) => {
   });
 });
 
-const cancelRentalOrder = catchAsync(async (req: Request, res: Response) => {
-  const { id } = req.params;
-  const customerId = req.user?.id as string;
-  const result = await rentalOrderServices.cancelRentalOrderInDB(id, customerId);
-
-  sendResponse(res, {
-    success: true,
-    statusCode: httpStatus.OK,
-    message: 'Rental order cancelled successfully',
-    data: result,
-  });
-});
 
 export const rentalOrderControllers = {
   createRentalOrder,
   getMyRentalOrders,
   getSingleRentalOrder,
-  cancelRentalOrder,
+ 
 };
