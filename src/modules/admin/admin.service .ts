@@ -41,9 +41,41 @@ const updateUserStatus = async (userId: string, status: "ACTIVE" | "SUSPENDED") 
   return result;
 };
 
+const getAllGear = async () => {
+  const result = await prisma.gearItem.findMany({
+    include: {
+      category: true,
+      provider: {
+        select: { id: true, name: true, email: true },
+      },
+    },
+    orderBy: { createdAt: "desc" },
+  });
+
+  return result;
+};
+
+const getAllRentals = async () => {
+  const result = await prisma.rentalOrder.findMany({
+    include: {
+      customer: {
+        select: { id: true, name: true, email: true },
+      },
+      items: {
+        include: {
+          gearItem: true,
+        },
+      },
+    },
+    orderBy: { createdAt: "desc" },
+  });
+
+  return result;
+};
 
 export const AdminService = {
   getAllUsers,
   updateUserStatus,
-  
+  getAllGear,
+  getAllRentals,
 };

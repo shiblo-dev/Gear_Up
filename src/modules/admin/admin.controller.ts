@@ -30,12 +30,31 @@ const updateUserStatus = catchAsync(async (req: Request, res: Response) => {
   });
 });
 
+const getAllGear = catchAsync(async (req: Request, res: Response) => {
+  const result = await AdminService.getAllGear();
 
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: "Gear listings retrieved successfully",
+    data: result,
+  });
+});
 
+const getAllRentals = catchAsync(async (req: Request, res: Response) => {
+  const result = await AdminService.getAllRentals();
 
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: "Rental orders retrieved successfully",
+    data: result,
+  });
+});
 
 export const AdminController = {
   getAllUsers,
   updateUserStatus,
-  
+  getAllGear,
+  getAllRentals,
 };
