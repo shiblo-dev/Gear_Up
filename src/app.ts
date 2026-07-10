@@ -8,7 +8,7 @@ import { notFound } from "./middlewares/notFound";
 import { globalErrorHandler } from "./middlewares/globalErrorHandler";
 
 // Routes
-import { userRoutes } from "./modules/user/user.route";
+
 import { authRoutes } from "./modules/auth/auth.route";
 import { categoryRoutes } from "./modules/category/category.route";
 import { GearItemRoutes } from "./modules/gearitem/gearitems.route";
@@ -16,6 +16,8 @@ import { rentalOrderRoutes } from "./modules/rentalOrder/rentalOrder.route";
  import { PaymentController } from "./modules/payment/payment.controller";
 import { paymentRoutes } from "./modules/payment/payment.route";
 import { ReviewRoutes } from "./modules/reviews/review.route";
+import { AdminRoutes } from "./modules/admin/admin.route";
+import { providerRoutes } from "./modules/provider/provider.route";
 
 const app: Application = express();
 
@@ -44,12 +46,13 @@ app.get("/", (req: Request, res: Response) => {
 });
 
 app.use("/api/auth", authRoutes);
-app.use("/api/users", userRoutes);
 app.use("/api/categories", categoryRoutes);
 app.use("/api/gear", GearItemRoutes);
 app.use("/api/rentals", rentalOrderRoutes);
 app.use("/api/payments", paymentRoutes);
+app.use("/api/provider", providerRoutes);
 app.use("/api/reviews", ReviewRoutes);
+app.use("/api/admin", AdminRoutes);
 app.use(notFound);
 app.use(globalErrorHandler);
 

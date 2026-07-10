@@ -23,4 +23,9 @@ router.get(
   rentalOrderControllers.getSingleRentalOrder
 );
 
+router.patch(
+  "/:id/cancel",
+  auth(Role.CUSTOMER),
+  rentalOrderControllers.cancelRentalOrder
+);
 export const rentalOrderRoutes = router;

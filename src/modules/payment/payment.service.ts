@@ -1,4 +1,4 @@
-import httpStatus from "http-status";
+ import httpStatus from "http-status";
 import Stripe from "stripe";
 
 import AppError from "../../errors/AppError";
@@ -29,10 +29,19 @@ const createPaymentSession = async (rentalOrderId: string, customerId: string) =
   }
 
   if (order.payment) {
-    throw new AppError(httpStatus.BAD_REQUEST, "Payment already exists for this order");
+    if (
+      order.payment.status === PaymentStatus.COMPLETED ||
+      order.payment.status === PaymentStatus.PENDING
+    ) {
+      throw new AppError(httpStatus.BAD_REQUEST, "Payment already exists for this order");
+    }
+
+    // Previous attempt FAILED (e.g. session expired or card declined) — clear it
+    // so the customer can retry. One-to-one relation means we must delete first.
+    await prisma.payment.delete({ where: { id: order.payment.id } });
   }
 
- 
+
   const amountInCents = Math.round(Number(order.totalAmount) * 100);
 
   const session = await stripe.checkout.sessions.create({
