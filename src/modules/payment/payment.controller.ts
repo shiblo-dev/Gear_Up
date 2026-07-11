@@ -8,6 +8,7 @@ import { sendResponse } from "../../utils/sendResponse";
 import AppError from "../../errors/AppError";
 import { paymentService } from "./payment.service";
 import stripe from "../../lib/stripe";
+import config from "../../config";
 
 const createPaymentSession = catchAsync(async (req: Request, res: Response) => {
   const { rentalOrderId } = req.body;
@@ -28,10 +29,10 @@ const handleStripeWebhook = catchAsync(async (req: Request, res: Response) => {
   let event: Stripe.Event;
 
   try {
-    event = stripe.webhooks.constructEvent(
+     event = stripe.webhooks.constructEvent(
       req.body,
       sig,
-      process.env.STRIPE_WEBHOOK_SECRET as string
+      config.stripe_webhook_secret
     );
   } catch (err) {
     throw new AppError(httpStatus.BAD_REQUEST, "Webhook signature verification failed");

@@ -1,8 +1,7 @@
  import httpStatus from "http-status";
 import Stripe from "stripe";
-
-import AppError from "../../errors/AppError";
-import { RentalStatus, PaymentStatus } from "../../../generated/prisma/enums";
+ import AppError from "../../errors/AppError";
+import { RentalStatus, PaymentStatus,Role } from "../../../generated/prisma/enums";
 import { prisma } from "../../lib/prisma";
 import stripe from "../../lib/stripe";
 
@@ -124,7 +123,7 @@ const getUserPayments = async (customerId: string) => {
   return payments;
 };
 
-const getPaymentById = async (paymentId: string, customerId: string, role: string) => {
+const getPaymentById = async (paymentId: string, customerId: string, role: Role) => {
   const payment = await prisma.payment.findUnique({
     where: { id: paymentId },
     include: { rentalOrder: true },
@@ -134,12 +133,10 @@ const getPaymentById = async (paymentId: string, customerId: string, role: strin
     throw new AppError(httpStatus.NOT_FOUND, "Payment not found");
   }
 
-  if (role !== "ADMIN" && payment.rentalOrder.customerId !== customerId) {
-    throw new AppError(httpStatus.FORBIDDEN, "You cannot access this payment");
-  }
+ if (role !== Role.ADMIN && payment.rentalOrder.customerId !== customerId) {
 
   return payment;
-};
+}};
 
 export const paymentService = {
   createPaymentSession,
