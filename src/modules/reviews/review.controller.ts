@@ -18,7 +18,7 @@ const createReview = catchAsync(async (req: Request, res: Response) => {
 
 const getReviewsByGearItem = catchAsync(async (req: Request, res: Response) => {
   const { gearItemId } = req.params;
-  const result = await ReviewService.getReviewsByGearItem(gearItemId);
+  const result = await ReviewService.getReviewsByGearItem(gearItemId as string);
 
   sendResponse(res, {
     statusCode: httpStatus.OK,
