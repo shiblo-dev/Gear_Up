@@ -1,13 +1,12 @@
- import { Request, Response } from "express";
+import { Request, Response } from "express";
 import httpStatus from "http-status";
 
 import { catchAsync } from "../../utils/catchAsync";
 import { sendResponse } from "../../utils/sendResponse";
-import { gearItemService } from "../gearitem/gearitems.service";
 import { providerService } from "./provider.service";
 
 const createGear = catchAsync(async (req: Request, res: Response) => {
-  const result = await gearItemService.createGearItem(
+  const result = await providerService.createGearItem(
     req.user!.id,
     req.body
   );
@@ -23,7 +22,7 @@ const createGear = catchAsync(async (req: Request, res: Response) => {
 const updateGear = catchAsync(async (req: Request, res: Response) => {
   const id = req.params.id as string;
 
-  const result = await gearItemService.updateGearItem(
+  const result = await providerService.updateGearItem(
     id,
     req.user!.id,
     req.user!.role,
@@ -41,7 +40,7 @@ const updateGear = catchAsync(async (req: Request, res: Response) => {
 const deleteGear = catchAsync(async (req: Request, res: Response) => {
   const id = req.params.id as string;
 
-  await gearItemService.deleteGearItem(
+  await providerService.deleteGearItem(
     id,
     req.user!.id,
     req.user!.role
