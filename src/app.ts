@@ -1,7 +1,7 @@
 import express, { Application, Request, Response } from "express";
 import cors from "cors";
 import cookieParser from "cookie-parser";
-import config from "./config/index";
+import config from "./config";
 
 // Middlewares
 import { notFound } from "./middlewares/notFound";
